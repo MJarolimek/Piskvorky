@@ -2,19 +2,27 @@ enum Color {Red, Green}
 
 class Round
 {
-    readonly maxLevel:number;
+    readonly maxLevel:number;   //2^(maxLevel-1) = size of biggest stone; 2^(maxLevel*2) = size of biggest cell
     private center:Point;
     private currentPlayer:number;
     private players:Array<Player>;
+    private cell:Cell;
 
     constructor(playerId1:string, playerId2:string, maxLevel:number)
     {
-        this.center = new Point();
+        console.log("start " + maxLevel);
 
+        this.center = new Point();
+        this.maxLevel = maxLevel;
+        
+        //players
         this.players = new Array();
         this.players.push(new Player(playerId1));
         this.players.push(new Player(playerId2));
         this.currentPlayer = 0;//todo random order
+
+        //cells
+        this.cell = new Cell(3, Math.pow(2, this.maxLevel*2));
     }
 
     public nextPlayer()
@@ -24,18 +32,20 @@ class Round
 
     public addStone(x:number,y:number)
     {
-        var size:number = this.players[this.currentPlayer].getLevel();
+        var size:number = Math.pow(2, this.players[this.currentPlayer].getLevel());
         var color = this.currentPlayer;
-
+        var cellHalfSize = Math.pow(2, this.maxLevel*2)/2;
         //test empty space
-        var stone = new Stone(x, y, size, color);
+       
         //add to
+        this.cell.add(x + cellHalfSize, y + cellHalfSize, size, color);
+
     }
 
-    getAllStones()
+    /*getAllStones()
     {
 
-    }
+    }*/
 }
 
 class Point
@@ -50,22 +60,88 @@ class Point
     }
 }
 
-class Stone
-{
-    private x:number;
-    private y:number;
-    private size:number;
-    private color:Color;
 
-    constructor(x:number, y:number, size:number, color:Color)
+class Cell
+{
+    index:number;
+    size:number;
+    color:Color;
+    children:Array<Cell>;
+
+    constructor(index:number, size:number)
     {
-        this.x = x;
-        this.y = y;
+        console.log("Cell: " + index + "; " + size);
+        this.index = index;
         this.size = size;
-        this.color = color;
+        this.children = new Array();
     }
 
+    public add(x:number, y:number, size:number, color:Color)
+    {
+        console.log("add(" + x + ", " + y + ", " + size + ", " + color+")");
+        if(size == this.size)   //stone cover full cell
+        {
+            this.color = color;
+            //todo
 
+            return;
+        }
+
+        if(x < this.size/2)   //left
+        {
+            if(y < this.size/2)   //top
+            {
+                var childIndex = 0;
+                var offsetY = 0;
+            }
+            else    //bottom
+            {
+                var childIndex = 2;
+                var offsetY = this.size/2;
+            }
+            var offsetX = 0;
+        }
+        else    //right
+        {
+            if(y < this.size/2)   //top
+            {
+                var childIndex = 1;
+                var offsetY = 0;
+            }
+            else    //bottom
+            {
+                var childIndex = 3;
+                var offsetY = this.size/2;
+            }
+            var offsetX = this.size/2;
+        }
+
+        if(this.children[childIndex] == undefined)    //create child
+        {
+            var child = new Cell(childIndex, this.size/2);
+            this.children[childIndex] = child;
+        }
+        
+        
+        this.children[childIndex].add(x - offsetX, y - offsetY, size, color);
+    }
+
+    /*private getDir():Point
+    {
+        switch (this.index)
+        {
+            case 0:
+                return new Point(-1,-1);
+            case 1:
+                return new Point(1,-1);
+            case 2:
+                return new Point(-1,1);
+            case 3:
+                return new Point(1,1);
+            default:
+                return new Point(0,0);
+        }
+    }*/
 }
 
 class Player
@@ -90,9 +166,18 @@ class Player
     }
 }
 
+//TEST GAME
 
+var playerId1 = "A";
+var playerId2 = "B";
 
+var round = new Round(playerId1,playerId2, 5);
 
+round.addStone(0,0);
+//round.nextPlayer();
+round.addStone(-1,0);
+
+/*
 
 
 
@@ -107,3 +192,5 @@ addStone()
 otestuj dohrani kola
 testFinish()
 zmen aktivniho hrace
+
+*/
