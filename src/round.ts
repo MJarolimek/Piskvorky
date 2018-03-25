@@ -42,7 +42,6 @@ class Round
     
         if(cell != undefined)
         {
-            console.log("succes");
 
             this.testWinRound(cell);
             //this.nextPlayer();
@@ -50,7 +49,7 @@ class Round
         }
         else
         {
-            console.log("fail");
+            console.log("error: You try to put new stone into full cell.");
 
             return undefined;
         }
@@ -59,32 +58,102 @@ class Round
     public testWinRound(cell:Cell):boolean
     {
         var horizontal:Array<Cell>;
-        horizontal = this.getOrtogonal(cell, new Point(-1,0)).reverse().concat([cell]).concat(this.getOrtogonal(cell, new Point(1,0)));
+        horizontal = this.getLine(cell, new Point(-1,0)).reverse().concat([cell]).concat(this.getLine(cell, new Point(1,0)));
 
         var vertical:Array<Cell>;
-        vertical = this.getOrtogonal(cell, new Point(0,-1)).reverse().concat([cell]).concat(this.getOrtogonal(cell, new Point(0,1)));
+        vertical = this.getLine(cell, new Point(0,-1)).reverse().concat([cell]).concat(this.getLine(cell, new Point(0,1)));
 
-        console.log(vertical.length);
+        var diagonal:Array<Cell>;
+        diagonal = this.getLine(cell, new Point(-1,-1)).reverse().concat([cell]).concat(this.getLine(cell, new Point(1,1)));
 
-        var str = "";
-        vertical.forEach(element => {
-            str += element.originalPos.toString();
-        });
-        console.log(str);
+        var antidiagonal:Array<Cell>;
+        antidiagonal = this.getLine(cell, new Point(1,-1)).reverse().concat([cell]).concat(this.getLine(cell, new Point(-1,1)));
+
+        if(horizontal.length >= 5)
+        {
+            var winLine = horizontal;
+        }
+        else if(vertical.length >= 5)
+        {
+            var winLine = vertical;
+        }
+        else if(diagonal.length >= 5)
+        {
+            var winLine = diagonal;
+        }
+        else if(antidiagonal.length >= 5)
+        {
+            var winLine = antidiagonal;
+        }
+
+        if(winLine)
+        {
+            var str = "You win: ";
+            winLine.forEach(element => {
+                str += element.originalPos.toString();
+            });
+            console.log(str);
+
+            return true;
+        }
 
         return false;
     }
 
-
-    private getOrtogonal(cell:Cell, vec:Point):Array<Cell>
+    private getLine(cell:Cell, vec:Point):Array<Cell>
     {
-        if(vec.x < 0)
+        if(vec.x < 0 && vec.y < 0)
+        {
+            //get left up
+            var A = (Ver.Bottom | Hor.Right);
+            var B = -1;
+            var C = (Ver.Top | Hor.Left);
+            var D = (Ver.Bottom | Hor.Left);
+            var E = (Ver.Top | Hor.Right);
+
+            var dir = -3;
+        }
+        else if(vec.x > 0 && vec.y < 0)
+        {
+            //get right up
+            var A = (Ver.Bottom | Hor.Left);
+            var B = -1;
+            var C = (Ver.Top | Hor.Right);
+            var D = (Ver.Bottom | Hor.Right);
+            var E = (Ver.Top | Hor.Left);
+
+            var dir = -1;
+        }
+        else if(vec.x < 0 && vec.y > 0)
+        {
+            //get left down
+            var A = (Ver.Top | Hor.Right);
+            var B = -1;
+            var C = (Ver.Top | Hor.Left);
+            var D = (Ver.Bottom | Hor.Left);
+            var E = (Ver.Bottom | Hor.Right);
+            
+            var dir = 1;
+        }
+        else if(vec.x > 0 && vec.y > 0)
+        {
+            //get right down
+            var A = (Ver.Top | Hor.Left);
+            var B = -1;
+            var C = (Ver.Bottom | Hor.Left);
+            var D = (Ver.Bottom | Hor.Right);
+            var E = (Ver.Top | Hor.Right);
+
+            var dir = 3;
+        }
+        else if(vec.x < 0)
         {
             //get left
             var A = (Ver.Top | Hor.Right);
             var B = (Ver.Bottom | Hor.Right);
             var C = (Ver.Top | Hor.Left);
             var D = (Ver.Bottom | Hor.Left);
+            var E = -1;
 
             var dir = -1;
         }
@@ -95,6 +164,7 @@ class Round
             var B = (Ver.Bottom | Hor.Left);
             var C = (Ver.Top | Hor.Right);
             var D = (Ver.Bottom | Hor.Right);
+            var E = -1;
 
             var dir = 1;
         }
@@ -105,6 +175,7 @@ class Round
             var B = (Ver.Bottom | Hor.Right);
             var C = (Ver.Top | Hor.Left);
             var D = (Ver.Top | Hor.Right);
+            var E = -1;
             
             var dir = -2;
         }
@@ -115,6 +186,7 @@ class Round
             var B = (Ver.Top | Hor.Right);
             var C = (Ver.Bottom | Hor.Left);
             var D = (Ver.Bottom | Hor.Right);
+            var E = -1;
 
             var dir = 2;
         }
@@ -126,9 +198,9 @@ class Round
         {
             var index = cell.index;
             
-            if(index == A || index == B) //left
+            if(index == A || index == B) //in same parent
             {
-                cell = cell.parent.children[index+dir]; //cell on right
+                cell = cell.parent.children[index+dir];
 
                 if(cell && color == cell.getColor())    //same color
                 {
@@ -139,21 +211,21 @@ class Round
                     return buffer;
                 }
             }
-            else    //right
+            else    //in different parent
             {
                 var counter = 0;
 
                 //go up in tree
-                while(cell.index == C || cell.index == D)
+                while(cell.index == C || cell.index == D || cell.index == E)
                 {
-                   if(cell.parent)
+                   if(cell.parent.parent)
                    {
                        counter++;
                        cell = cell.parent;
                    }
                    else
                    {
-                        break;  //finish in root
+                        return buffer;  //finish in root
                    }
                 }
 
@@ -162,7 +234,6 @@ class Round
 
                 if(!cell || cell.getColor() != Color.Empty)
                 {
-                    console.log("r 100");
                     return buffer;
                 }
 
@@ -173,7 +244,6 @@ class Round
                     cell = cell.children[index-dir];
                     if(!cell || cell.getColor() != Color.Empty)
                     {
-                        console.log("r 105");
                         return buffer;
                     }
                 }
@@ -186,7 +256,6 @@ class Round
                 }
                 else    //empty or different color
                 {
-                    console.log("r 115");
                     return buffer;
                 }
             }
@@ -330,10 +399,10 @@ var playerId2 = "B";
 
 var round = new Round(playerId1,playerId2, 2);
 
-round.addStone(0,1);
-round.addStone(0,3);
-round.addStone(0,2);
-round.addStone(0,-1);
+round.addStone(1,1);
+round.addStone(3,3);
+round.addStone(2,2);
+round.addStone(-1,-1);
 round.addStone(0,0);
 /*
 
