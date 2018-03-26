@@ -2,9 +2,10 @@ enum Color {Empty, Red, Green}
 enum Ver {Top, Bottom=2}
 enum Hor {Left, Right}
 
-class Round
+export class Round
 {
-    readonly maxLevel:number;   //2^(maxLevel-1) = size of biggest stone; 2^(maxLevel*2) = size of biggest cell
+    readonly sizeMultiple = 128;
+    readonly maxLevel:number;   //2^(maxLevel-1) = size of biggest stone; 2^(maxLevel)*sizeMultiple = size of biggest cell resp. playground
     private center:Point;
     private currentPlayer:number;
     private players:Array<Player>;
@@ -12,7 +13,7 @@ class Round
 
     constructor(playerId1:string, playerId2:string, maxLevel:number)
     {
-        console.log("start " + maxLevel);
+        console.log("start game of: " + playerId1 + "; " + playerId2 + "; " + maxLevel);
 
         this.center = new Point();
         this.maxLevel = maxLevel;
@@ -24,7 +25,7 @@ class Round
         this.currentPlayer = 0;//todo random order
 
         //cells
-        this.cell = new Cell(3, Math.pow(2, this.maxLevel*2), undefined);
+        this.cell = new Cell(3, Math.pow(2, this.maxLevel) * this.sizeMultiple, undefined);
     }
 
     public nextPlayer()
@@ -36,7 +37,16 @@ class Round
     {
         var size:number = Math.pow(2, this.players[this.currentPlayer].getLevel());
         var color = this.players[this.currentPlayer].color;
-        var cellHalfSize = Math.pow(2, this.maxLevel*2)/2;
+
+        x = Math.round(x - (Math.abs(Math.round(x)) % size));
+        y = Math.round(y - (Math.abs(Math.round(y)) % size));
+
+        var cellHalfSize = (Math.pow(2, this.maxLevel) * this.sizeMultiple)/2;
+        if(x < -cellHalfSize || y < -cellHalfSize || x >= cellHalfSize || y >= cellHalfSize)
+        {
+            console.log("error: You try to put new stone out of playing area: "+ x + "; "+ y);
+            return undefined;
+        }
         
         var cell = this.cell.add(x, y, x + cellHalfSize, y + cellHalfSize, size, color);
     
@@ -44,12 +54,12 @@ class Round
         {
 
             this.testWinRound(cell);
-            //this.nextPlayer();
+            this.nextPlayer();
             return cell;
         }
         else
         {
-            console.log("error: You try to put new stone into full cell.");
+            console.log("error: You try to put new stone into full cell: "+ x + "; " + y);
 
             return undefined;
         }
@@ -88,11 +98,20 @@ class Round
 
         if(winLine)
         {
-            var str = "You win: ";
+            var str = "Player " + this.players[this.currentPlayer].id + " win: ";
             winLine.forEach(element => {
                 str += element.originalPos.toString();
             });
             console.log(str);
+
+            if(this.players[this.currentPlayer].getLevel() < this.maxLevel-1)
+            {
+                this.upgradeLevel();
+            }
+            else
+            {
+                console.log("Player " + this.players[this.currentPlayer].id + " win whole game!");
+            }
 
             return true;
         }
@@ -263,10 +282,91 @@ class Round
         return buffer;
     }
 
-    /*getAllStones()
+    private upgradeLevel()
     {
+        var size = Math.pow(2, this.players[this.currentPlayer].levelUp());
+        var color = this.players[this.currentPlayer].color;
 
-    }*/
+        //add all potential cells to array
+        var queue:Array<Cell> = new Array();
+        queue = this.getChildrenOfSize(this.cell, size);
+
+        //assorted to win and pat Cells
+        var winCells:Array<Cell> = new Array();
+        var patCells:Array<Cell> = new Array();
+    
+        queue.forEach(cell => 
+        {
+           var counter1 = 0;
+           var counter2 = 0;
+           var originalPos;
+
+           for(var i=0; i < 4; i++)
+           {
+                if(cell.children[i] && cell.children[i].originalPos)
+                {
+                    if(cell.children[i].getColor() == color)
+                    {
+                        counter1++;
+                    }
+                    else
+                    {
+                        counter2++;
+                    }
+
+                    if(originalPos == undefined)
+                    {
+                        var x = cell.children[i].originalPos.x - (i%2)*cell.children[i].size;            //offset x position from child 
+                        var y = cell.children[i].originalPos.y - Math.floor(i/2)*cell.children[i].size;  //offset y position from child 
+                        originalPos = new Point(x, y);
+                    }
+                }
+           }
+
+           if(counter1 > counter2)  //win
+           {
+               cell.setColor(color);
+               cell.originalPos = originalPos;
+               winCells.push(cell);
+           }
+           else if(counter1 == counter2 && counter1 > 0)    //pat and almost one cell is full on curent size
+           {
+                cell.originalPos = originalPos; //todo remove - only cells with not empty color has originalPos
+                patCells.push(cell);
+           } 
+        });
+
+        var str = "All win cells: ";
+        winCells.forEach(element => {
+            str += element.originalPos.toString();
+        });
+        console.log(str);
+
+        var str = "All pat cells: ";
+        patCells.forEach(element => {
+            str += element.originalPos.toString();
+        });
+        console.log(str);
+    }
+
+    private getChildrenOfSize(cell:Cell, size:number):Array<Cell>
+    {
+        if(cell && cell.getColor() == Color.Empty)
+        {
+            if(cell.size > size) //bigger
+            {
+                return this.getChildrenOfSize(cell.children[0], size).concat(this.getChildrenOfSize(cell.children[1], size)).concat(this.getChildrenOfSize(cell.children[2], size)).concat(this.getChildrenOfSize(cell.children[3], size));
+            }
+            else
+            {
+                return [cell];
+            }
+        }
+        else    //empty
+        {
+            return [];
+        }
+    }
 }
 
 class Point
@@ -310,7 +410,7 @@ class Cell
         //console.log("add(" + x + ", " + y + ", " + size + ", " + color+")");
         if(size == this.size)   //stone cover full cell
         {
-            if(this.color == Color.Empty)
+            if(this.color == Color.Empty && this.children.length == 0)  //cel has to has no children
             {
                 this.color = color;
                 this.originalPos = new Point(originalX, originalY);
@@ -366,9 +466,14 @@ class Cell
         return this.color;
     }
 
+    public setColor(color:Color)
+    {
+        this.color = color;
+    }
+
 }
 
-class Player
+export class Player
 {
     private level:number;
     readonly id:string;
@@ -381,9 +486,10 @@ class Player
         this.color = color;
     }
 
-    public levelUp()
+    public levelUp():number
     {
         this.level++;
+        return this.level;
     }
 
     public getLevel():number
@@ -392,18 +498,6 @@ class Player
     }
 }
 
-//TEST GAME
-
-var playerId1 = "A";
-var playerId2 = "B";
-
-var round = new Round(playerId1,playerId2, 2);
-
-round.addStone(1,1);
-round.addStone(3,3);
-round.addStone(2,2);
-round.addStone(-1,-1);
-round.addStone(0,0);
 /*
 
 
@@ -416,6 +510,7 @@ vykresli animovane pouzitelna pole
 getFullPlaces()
 interaktivni faze
 addStone()
+
 otestuj dohrani kola
 testFinish()
 zmen aktivniho hrace
