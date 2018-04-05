@@ -2,7 +2,7 @@ enum Color {Empty, Red, Green}
 enum Ver {Top, Bottom=2}
 enum Hor {Left, Right}
 
-export class Round
+class Round
 {
     readonly sizeMultiple = 128;
     readonly maxLevel:number;   //2^(maxLevel-1) = size of biggest stone; 2^(maxLevel)*sizeMultiple = size of biggest cell resp. playground
@@ -473,7 +473,7 @@ class Cell
 
 }
 
-export class Player
+class Player
 {
     private level:number;
     readonly id:string;
@@ -497,22 +497,3 @@ export class Player
        return this.level;
     }
 }
-
-/*
-
-
-
-klik na tlacitko start
-vykresli grid
-vykresli animovane kameny
-getAllStones()
-vykresli animovane pouzitelna pole
-getFullPlaces()
-interaktivni faze
-addStone()
-
-otestuj dohrani kola
-testFinish()
-zmen aktivniho hrace
-
-*/
