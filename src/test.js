@@ -85,6 +85,9 @@ round = new ROUND.Round(playerId1,playerId2, 3);
 
 round.addStone(0,0);    //x
 round.addStone(6,1);    //0
+
+round.setWindow(-2, -2, 4, 4);
+
 round.addStone(1,0);    //x
 round.addStone(6,2);    //0
 round.addStone(2,0);    //x
@@ -96,3 +99,5 @@ round.addStone(6,6);    //0
 round.addStone(6,1);    //x
 round.addStone(-1,-1);   //o
 round.addStone(-3,0);    //x
+
+round.updateWindow(-3, -2, 4, 4);

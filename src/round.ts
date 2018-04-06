@@ -2,11 +2,11 @@ enum Color {Empty, Red, Green}
 enum Ver {Top, Bottom=2}
 enum Hor {Left, Right}
 
-class Round
+export class Round
 {
     readonly sizeMultiple = 128;
     readonly maxLevel:number;   //2^(maxLevel-1) = size of biggest stone; 2^(maxLevel)*sizeMultiple = size of biggest cell resp. playground
-    private center:Point;
+    private window:Rectangle;
     private currentPlayer:number;
     private players:Array<Player>;
     private cell:Cell;
@@ -15,7 +15,6 @@ class Round
     {
         console.log("start game of: " + playerId1 + "; " + playerId2 + "; " + maxLevel);
 
-        this.center = new Point();
         this.maxLevel = maxLevel;
         
         //players
@@ -31,6 +30,130 @@ class Round
     public nextPlayer()
     {
         this.currentPlayer = (this.currentPlayer + 1) % this.players.length;
+    }
+
+    public setWindow(windowX:number, windowY:number, windowWidth:number, windowHeight:number):Array<Cell>
+    {
+        this.window = new Rectangle(windowX, windowY, windowWidth, windowHeight);
+
+        var result:Array<Cell> = this.getVisibleStones(this.cell, this.window);
+
+        console.log("visible " + result.length + " cells: " + result.toString());
+
+        return result;
+    }
+
+    public updateWindow(windowX:number, windowY:number, windowWidth:number, windowHeight:number):Array<Array<Cell>>
+    {
+        var addStones:Array<Cell> = new Array();
+        var removeStones:Array<Cell> = new Array();
+        var newWindow:Rectangle = new Rectangle(windowX, windowY, windowWidth, windowHeight);
+
+        if(!this.window)
+        {
+            this.window = new Rectangle(0,0,0,0);
+        }
+
+        var result:Array<Array<Cell>> = this.getVisibleStonesIncrement(this.cell, newWindow);
+
+        console.log("add " + result[0].length + " cells: " + result[0].toString());
+        console.log("remove " + result[1].length + " cells: " + result[1].toString());
+
+        this.window = newWindow;
+
+        return result;
+    }
+    
+    private getVisibleStones(cell:Cell, newWindow:Rectangle):Array<Cell>
+    {      
+        if(cell)
+        {  
+            if(cell.getColor() != Color.Empty)
+            {
+                //is out
+                if(cell.originalPos.x + cell.size < newWindow.x || cell.originalPos.y + cell.size < newWindow.y || 
+                    cell.originalPos.x > newWindow.x + newWindow.width || cell.originalPos.y > newWindow.y + newWindow.height)
+                {
+                    cell.inWindow = false;
+                    return [];
+                }
+                else    //is in
+                {
+                    cell.inWindow = true;
+                    return [cell];
+                }
+            }
+            else
+            {
+                var stones:Array<Cell> = new Array();
+
+                for(var i=0; i < 4; i++)
+                {
+                    if(cell.children[i])
+                    {
+                        stones = stones.concat(this.getVisibleStones(cell.children[i], newWindow));
+                    }
+                }
+
+                return stones;
+            }
+        }
+        return [];
+    }
+
+    private getVisibleStonesIncrement(cell:Cell, newWindow:Rectangle):Array<Array<Cell>>
+    {      
+        if(cell)
+        {  
+            if(cell.getColor() != Color.Empty)
+            {
+                //is out
+                if(cell.originalPos.x + cell.size < newWindow.x || cell.originalPos.y + cell.size < newWindow.y || 
+                    cell.originalPos.x > newWindow.x + newWindow.width || cell.originalPos.y > newWindow.y + newWindow.height)
+                {
+                    if(cell.inWindow)
+                    {
+                        cell.inWindow = false;
+                        return [[],[cell]];
+                    }
+                    else
+                    {
+                        return [[],[]];
+                    }
+
+                }
+                else    //is in
+                {
+                    if(!cell.inWindow)
+                    {
+                        cell.inWindow = true;
+                        return [[cell],[]];
+                    }
+                    else
+                    {
+                        return [[],[]];
+                    }
+                }
+            }
+            else
+            {
+                var addStones:Array<Cell> = new Array();
+                var removeStones:Array<Cell> = new Array();
+
+                for(var i=0; i < 4; i++)
+                {
+                    if(cell.children[i])
+                    {
+                        var arrays = this.getVisibleStonesIncrement(cell.children[i], newWindow);
+                        addStones = addStones.concat(arrays[0]);
+                        removeStones = removeStones.concat(arrays[1]);
+                    }
+                }
+
+                return [addStones,removeStones];
+            }
+        }
+        return [[],[]];
     }
 
     public addStone(x:number, y:number):Cell
@@ -367,6 +490,8 @@ class Round
             return [];
         }
     }
+
+
 }
 
 class Point
@@ -386,6 +511,31 @@ class Point
     }
 }
 
+class Rectangle
+{
+    public x:number = 0;
+    public y:number = 0;
+    public width:number = 0;
+    public height:number = 0;
+
+    constructor(x?:number, y?:number, width?:number, height?:number)
+    {
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+    }
+
+    public toString():string
+    {
+        return "["+this.x+"; "+this.y+"; "+this.width+"; "+this.height+"]";
+    }
+}
+
+class Screen
+{
+    //TODO
+}
 
 class Cell
 {
@@ -395,6 +545,7 @@ class Cell
     private color:Color = Color.Empty;
     public children:Array<Cell>;
     public originalPos:Point;
+    public inWindow:Boolean;
 
     constructor(index:number, size:number, parent:Cell)
     {
@@ -471,9 +622,14 @@ class Cell
         this.color = color;
     }
 
+    public toString():string
+    {
+        return "{"+this.index+", color:"+this.color+"; size:"+this.size+"; originalPos:"+this.originalPos.toString()+"}";
+    }
+
 }
 
-class Player
+export class Player
 {
     private level:number;
     readonly id:string;
@@ -497,3 +653,7 @@ class Player
        return this.level;
     }
 }
+
+//resolution of Round in cells
+//resoulution of game in pixels, 1 cell has constant size in px (32)
+//resolution of screen in pixels, between game and windo is zoom, zoom=1 mean game=window, minimal zoom = 1/maxLevel 
