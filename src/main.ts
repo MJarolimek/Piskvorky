@@ -6,8 +6,19 @@ enum Keycode {Left = 65, Right = 68, Up = 87, Down = 83, ZoomIn = 73, ZoomOut = 
 enum Status {Menu, Ingame}
 
 //CONST
-const cellSize:number = 32;         //size of basic cell in pixels
-const sizeMultiple:number = 128;    //2^(maxLevel-1) = size of biggest stone; 2^(maxLevel)*sizeMultiple = size of biggest cell resp. board
+const c_cellSize = 32;         //size of basic cell in pixels
+const c_sizeMultiple = 128;    //2^(maxLevel-1) = size of biggest stone; 2^(maxLevel)*sizeMultiple = size of biggest cell resp. board
+const c_animationTime = 250;   //duration of move and scale animation in milisec
+
+function getSizeOfCell(maxLevel:number):number
+{
+    return Math.pow(2, maxLevel)*c_sizeMultiple;
+}
+
+function getSizeOfBoard(maxLevel:number):number
+{
+    return getSizeOfCell(maxLevel)*c_cellSize;
+}
 
 
 class Cell
@@ -186,7 +197,7 @@ class Round
         this.currentPlayer = 0;//todo random order
 
         //cells
-        this.cell = new Cell(3, Math.pow(2, this.maxLevel) * sizeMultiple, undefined);
+        this.cell = new Cell(3, getSizeOfCell(this.maxLevel), undefined);
     }
 
     public nextPlayer()
@@ -326,7 +337,7 @@ class Round
         x = Math.round(x - (Math.abs(Math.round(x)) % size));
         y = Math.round(y - (Math.abs(Math.round(y)) % size));
 
-        var cellHalfSize = (Math.pow(2, this.maxLevel) * sizeMultiple)/2;
+        var cellHalfSize = getSizeOfCell(this.maxLevel)/2;
         if(x < -cellHalfSize || y < -cellHalfSize || x >= cellHalfSize || y >= cellHalfSize)
         {
             console.log("error: You try to put new stone out of playing area: "+ x + "; "+ y);
@@ -658,132 +669,79 @@ class Board
 {
     public isStable:boolean;
     public zoomLevel:number;
-    public zoomLevelNew:number;
-    public centerPoint:Point;
-    public centerPointNew:Point;
-    public originPoint:Point;
+    public position:Point;
 
     readonly maxZoomLevel:number;
+    readonly window:Rectangle; 
 
-    constructor(maxLevel:number, x:number, y:number)
+    constructor(maxLevel:number, originX:number, originY:number, window:Rectangle)
     {
         this.zoomLevel = 1;
-        this.zoomLevelNew = 1;
         this.maxZoomLevel = maxLevel + 1;
 
-        this.centerPoint = new Point(x,y);
-        this.centerPointNew = new Point(x,y);
-        this.originPoint = new Point(x,y);
+        this.position = new Point(originX, originY);
+        this.window = window;
 
         this.isStable = true;
     }
 
-    public move(xDir:number, yDir:number)
+    public move(xDir:number, yDir:number, boundaries:Rectangle)
     {
         console.log("move("+xDir+", "+yDir+")");
 
-        this.centerPointNew.x += xDir*cellSize*this.zoomLevelNew;
-        this.centerPointNew.y += yDir*cellSize*this.zoomLevelNew;
+        var position = new Point(this.position.x + xDir*c_cellSize*this.zoomLevel, this.position.y + yDir*c_cellSize*this.zoomLevel);
+        position = this.checkBoundaries(position, boundaries);
+
+        this.position.x = position.x;
+        this.position.y = position.y;
 
         this.isStable = false;
     }
 
-    public zoom(dir:number)
+    public zoom(dir:number, originX:number, originY:number, boundaries:Rectangle)
     {
         console.log("zoom("+dir+")");
+        var previousZoomLevel = this.zoomLevel;
+        
         if(dir > 0)
         {
-            if(this.zoomLevelNew + 1 > this.maxZoomLevel)
+            if(this.zoomLevel + 1 > this.maxZoomLevel)
             {
-                this.zoomLevelNew = this.maxZoomLevel;
+                this.zoomLevel = this.maxZoomLevel;
             }
             else
             {
-                this.zoomLevelNew += 1;
+                this.zoomLevel += 1;
             }
         }
         else if(dir < 0)
         {
-            if(this.zoomLevelNew - 1 < 1)
+            if(this.zoomLevel - 1 < 1)
             {
-                this.zoomLevelNew = 1;
+                this.zoomLevel = 1;
             }
             else
             {
-                this.zoomLevelNew -= 1;
+                this.zoomLevel -= 1;
             }
         }
 
-        if(this.zoomLevel != this.zoomLevelNew)
+        if(this.zoomLevel != previousZoomLevel)
         {
-            var scale = 1/(Math.pow(2,this.zoomLevel-1));
-            this.centerPointNew.x = this.originPoint.x + (this.centerPointNew.x - this.originPoint.x)*scale;
-            this.centerPointNew.y = this.originPoint.y + (this.centerPointNew.y - this.originPoint.y)*scale;
+            var previousScale = 1/(Math.pow(2,previousZoomLevel-1));
+            var currentScale = 1/(Math.pow(2,this.zoomLevel-1));
+            var scale = currentScale/previousScale;
+
+            var position = new Point(originX + (this.position.x - originX)*scale, originY + (this.position.y - originY)*scale);
+            position = this.checkBoundaries(position, boundaries);
+
+            this.position.x = position.x;
+            this.position.y = position.y;
+
+            //TODO test baundaries
 
             this.isStable = false;
         }
-        
-        //console.log("new zoom level ("+this.zoomLevelNew+")");
-        console.log(this.centerPoint.x + "; " + this.centerPointNew.x +"; "+ this.originPoint.x);
-    }
-
-    public update()
-    {
-        this.zoomLevel = (this.zoomLevel + this.zoomLevelNew)/2;
-
-        if(Math.abs(this.zoomLevel - this.zoomLevelNew) < 0.001)
-        {
-            this.zoomLevel = this.zoomLevelNew;
-            var zoomStable = true;
-        }
-
-        this.centerPoint.x = (this.centerPoint.x + this.centerPointNew.x)/2;
-
-        if(Math.abs(this.centerPoint.x - this.centerPointNew.x) < 0.001)
-        {
-            this.centerPoint.x = this.centerPointNew.x;
-            var positionXStable = true;
-        }
-
-        this.centerPoint.y = (this.centerPoint.y + this.centerPointNew.y)/2;
-
-        if(Math.abs(this.centerPoint.y - this.centerPointNew.y) < 0.001)
-        {
-            this.centerPoint.y = this.centerPointNew.y;
-            var positionYStable = true;
-        }
-
-        if(positionXStable && positionYStable && zoomStable)
-        {
-            this.isStable = true;
-        }
-    }
-
-    public setScale(scale:number)
-    {
-        //TODO
-        //test boundaris 1 and maxZoomLevel
-        /*var zoomLevelNew = Math.log(1/scale) + 1;
-
-        if(zoomLevelNew > this.maxZoomLevel)
-        {
-            this.zoomLevelNew = this.maxZoomLevel;
-        }
-        else if(zoomLevelNew < 0)
-        {
-            this.zoomLevelNew = 0;
-        }
-        else
-        {
-            this.zoomLevelNew = zoomLevelNew;
-        }
-
-        this.isStable = false;*/
-    }
-
-    public setPosition(position:Point)
-    {
-        //todo
     }
 
     public getScale():number
@@ -793,7 +751,27 @@ class Board
 
     public getPosition():Point
     {
-        return this.centerPoint;
+        return this.position;
+    }
+
+    private checkBoundaries(position:Point, boundaries:Rectangle):Point
+    {
+        var sizeX = boundaries.width*this.getScale();
+        var sizeY = boundaries.height*this.getScale();
+
+        var newPosition:Point = new Point(position.x, position.y);
+
+        console.log(sizeY + "; " + this.window.toString());
+        if(sizeX < this.window.width)
+        {
+            newPosition.x = this.window.x + this.window.width/2;
+        }
+        if(sizeY < this.window.height)
+        {
+            newPosition.y = this.window.y + this.window.height/2;
+        }
+
+        return newPosition;
     }
 
 }
