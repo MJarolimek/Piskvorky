@@ -714,12 +714,17 @@ class Board
             }
         }
 
-        //this.centerPointNew.x += xDir*cellSize*this.zoomLevelNew;
-        //this.centerPointNew.y += yDir*cellSize*this.zoomLevelNew;
+        if(this.zoomLevel != this.zoomLevelNew)
+        {
+            var scale = 1/(Math.pow(2,this.zoomLevel-1));
+            this.centerPointNew.x = this.originPoint.x + (this.centerPointNew.x - this.originPoint.x)*scale;
+            this.centerPointNew.y = this.originPoint.y + (this.centerPointNew.y - this.originPoint.y)*scale;
 
-        this.isStable = false;
+            this.isStable = false;
+        }
         
-        console.log("new zoom level ("+this.zoomLevelNew+")");
+        //console.log("new zoom level ("+this.zoomLevelNew+")");
+        console.log(this.centerPoint.x + "; " + this.centerPointNew.x +"; "+ this.originPoint.x);
     }
 
     public update()
