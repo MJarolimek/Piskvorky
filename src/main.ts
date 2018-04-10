@@ -9,6 +9,8 @@ enum Status {Menu, Ingame}
 const c_cellSize = 32;         //size of basic cell in pixels
 const c_sizeMultiple = 128;    //2^(maxLevel-1) = size of biggest stone; 2^(maxLevel)*sizeMultiple = size of biggest cell resp. board
 const c_animationTime = 250;   //duration of move and scale animation in milisec
+const c_rootWidth = 550;
+const c_rootHeight = 400;
 
 function getSizeOfCell(maxLevel:number):number
 {
@@ -30,6 +32,7 @@ class Cell
     public children:Array<Cell>;
     public originalPos:Point;
     public inWindow:Boolean;
+    public mc:any;
 
     constructor(index:number, size:number, parent:Cell)
     {
@@ -179,12 +182,16 @@ class Player
 class Round
 {
     readonly maxLevel:number;   //2^(maxLevel-1) = size of biggest stone; 2^(maxLevel)*sizeMultiple = size of biggest cell resp. board
-    private window:Rectangle;
     private currentPlayer:number;
     private players:Array<Player>;
     private cell:Cell;
 
-    constructor(playerId1:string, playerId2:string, maxLevel:number)
+    public board:Board;
+
+    public addStones:Array<Cell>;
+    public removeStones:Array<Cell>;
+
+    constructor(playerId1:string, playerId2:string, maxLevel:number, positionX:number, positionY:number)
     {
         console.log("start game of: " + playerId1 + "; " + playerId2 + "; " + maxLevel);
 
@@ -198,6 +205,12 @@ class Round
 
         //cells
         this.cell = new Cell(3, getSizeOfCell(this.maxLevel), undefined);
+
+        //board
+        this.board = new Board(maxLevel, new Point(positionX, positionY), new Rectangle(0, 0, c_rootWidth, c_rootHeight));
+   
+        //window in cell coordinates and position in top left corner
+        this.setWindow();        
     }
 
     public nextPlayer()
@@ -205,36 +218,70 @@ class Round
         this.currentPlayer = (this.currentPlayer + 1) % this.players.length;
     }
 
-    public setWindow(windowX:number, windowY:number, windowWidth:number, windowHeight:number):Array<Cell>
+    public setWindow()
     {
-        this.window = new Rectangle(windowX, windowY, windowWidth, windowHeight);
+        var cellWindow = this.getCellWindow();
 
-        var result:Array<Cell> = this.getVisibleStones(this.cell, this.window);
+        this.addStones = this.getVisibleStones(this.cell, cellWindow);
 
-        console.log("visible " + result.length + " cells: " + result.toString());
+        console.log("visible " + this.addStones.length + " cells: " + this.addStones.toString());
 
-        return result;
+        if(!this.addStones.length)
+        {
+            this.addStones = undefined;
+        }
     }
 
-    public updateWindow(windowX:number, windowY:number, windowWidth:number, windowHeight:number):Array<Array<Cell>>
+    public updateWindow()
     {
-        var addStones:Array<Cell> = new Array();
-        var removeStones:Array<Cell> = new Array();
-        var newWindow:Rectangle = new Rectangle(windowX, windowY, windowWidth, windowHeight);
+        var cellWindow = this.getCellWindow();
 
-        if(!this.window)
+        var result:Array<Array<Cell>> = this.getVisibleStonesIncrement(this.cell, cellWindow);
+
+        this.addStones = result[0];
+        this.removeStones = result[1];
+
+        if(!this.addStones.length)
         {
-            this.window = new Rectangle(0,0,0,0);
+            this.addStones = undefined;
         }
-
-        var result:Array<Array<Cell>> = this.getVisibleStonesIncrement(this.cell, newWindow);
+        if(!this.removeStones.length)
+        {
+            this.removeStones = undefined;
+        }
 
         console.log("add " + result[0].length + " cells: " + result[0].toString());
         console.log("remove " + result[1].length + " cells: " + result[1].toString());
+    }
 
-        this.window = newWindow;
+    public boardMove(xDir:number, yDir:number)
+    {
+        this.board.move(xDir, yDir);
+        this.updateWindow();
+    }
 
-        return result;
+    public boardZoom(dir:number, originX:number, originY:number)
+    {
+        this.board.zoom(dir, originX, originY);
+        this.updateWindow();
+    }
+
+    private getCellWindow():Rectangle
+    {
+        var invertScale = 1/this.board.getScale();
+
+        console.log("A " + this.board.window.width + "; " + this.board.position.x);
+
+        var x = (-this.board.window.width/2) * invertScale / c_cellSize;
+        var y = (-this.board.window.height/2) * invertScale / c_cellSize;
+        var width = this.board.window.width * invertScale / c_cellSize;
+        var height = this.board.window.height * invertScale / c_cellSize;
+
+        var cellWindow = new Rectangle(x, y, width, height)
+
+        console.log("getCellWindow " + cellWindow.toString());
+
+        return cellWindow;
     }
     
     private getVisibleStones(cell:Cell, newWindow:Rectangle):Array<Cell>
@@ -674,23 +721,23 @@ class Board
     readonly maxZoomLevel:number;
     readonly window:Rectangle; 
 
-    constructor(maxLevel:number, originX:number, originY:number, window:Rectangle)
+    constructor(maxLevel:number, position:Point, window:Rectangle)
     {
         this.zoomLevel = 1;
         this.maxZoomLevel = maxLevel + 1;
 
-        this.position = new Point(originX, originY);
+        this.position = position;
         this.window = window;
 
         this.isStable = true;
     }
 
-    public move(xDir:number, yDir:number, boundaries:Rectangle)
+    public move(xDir:number, yDir:number)
     {
         console.log("move("+xDir+", "+yDir+")");
 
         var position = new Point(this.position.x + xDir*c_cellSize*this.zoomLevel, this.position.y + yDir*c_cellSize*this.zoomLevel);
-        position = this.checkBoundaries(position, boundaries);
+        position = this.checkBoundaries(position);
 
         this.position.x = position.x;
         this.position.y = position.y;
@@ -698,9 +745,10 @@ class Board
         this.isStable = false;
     }
 
-    public zoom(dir:number, originX:number, originY:number, boundaries:Rectangle)
+    public zoom(dir:number, originX:number, originY:number)
     {
         console.log("zoom("+dir+")");
+
         var previousZoomLevel = this.zoomLevel;
         
         if(dir > 0)
@@ -733,12 +781,10 @@ class Board
             var scale = currentScale/previousScale;
 
             var position = new Point(originX + (this.position.x - originX)*scale, originY + (this.position.y - originY)*scale);
-            position = this.checkBoundaries(position, boundaries);
+            position = this.checkBoundaries(position);
 
             this.position.x = position.x;
             this.position.y = position.y;
-
-            //TODO test baundaries
 
             this.isStable = false;
         }
@@ -754,21 +800,41 @@ class Board
         return this.position;
     }
 
-    private checkBoundaries(position:Point, boundaries:Rectangle):Point
+    private checkBoundaries(position:Point):Point
     {
-        var sizeX = boundaries.width*this.getScale();
-        var sizeY = boundaries.height*this.getScale();
+        var sizeX = getSizeOfBoard(this.maxZoomLevel-1)*this.getScale();
+        var sizeY = getSizeOfBoard(this.maxZoomLevel-1)*this.getScale();
 
         var newPosition:Point = new Point(position.x, position.y);
 
-        console.log(sizeY + "; " + this.window.toString());
+        console.log(sizeX + "; " + this.window.toString() + "; " + position.x);
+        
+        //x
         if(sizeX < this.window.width)
         {
             newPosition.x = this.window.x + this.window.width/2;
         }
+        else if(position.x > this.window.x + sizeX/2)
+        {
+            newPosition.x = this.window.x + sizeX/2;
+        }
+        else if(position.x < - this.window.x - sizeX/2 + this.window.width)
+        {
+            newPosition.x = - this.window.x - sizeX/2 + this.window.width;
+        }
+
+        //y
         if(sizeY < this.window.height)
         {
             newPosition.y = this.window.y + this.window.height/2;
+        }
+        else if(position.y > this.window.y + sizeY/2)
+        {
+            newPosition.y = this.window.y + sizeY/2;
+        }
+        else if(position.y < - this.window.y - sizeY/2 + this.window.height)
+        {
+            newPosition.y = - this.window.y - sizeY/2 + this.window.height;
         }
 
         return newPosition;
