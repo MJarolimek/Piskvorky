@@ -3,7 +3,8 @@ enum Color {Empty, Red, Green}
 enum Ver {Top, Bottom=2}
 enum Hor {Left, Right}
 enum Keycode {Left = 65, Right = 68, Up = 87, Down = 83, ZoomIn = 73, ZoomOut = 79}
-enum Status {Menu, Ingame}
+enum Status {Menu, Ingame, UIOverlay}
+enum IngameStatus {WaitUser, AddNew, AddNewAnim, ShowWin, ShowWinAnim, FadeOut, FadeIn}
 
 //CONST
 const c_cellSize = 32;         //size of basic cell in pixels
@@ -12,6 +13,7 @@ const c_animationTime = 250;   //duration of move and scale animation in milisec
 const c_rootWidth = 550;
 const c_rootHeight = 400;
 
+//BASIC FUNCTIONS
 function getSizeOfCell(maxLevel:number):number
 {
     return Math.pow(2, maxLevel)*c_sizeMultiple;
@@ -22,8 +24,8 @@ function getSizeOfBoard(maxLevel:number):number
     return getSizeOfCell(maxLevel)*c_cellSize;
 }
 
-
-class Cell
+//CLASSES
+class Cell  //resolution of Round in cells
 {
     readonly index:number;
     readonly size:number;
@@ -31,7 +33,6 @@ class Cell
     private color:Color = Color.Empty;
     public children:Array<Cell>;
     public originalPos:Point;
-    public inWindow:Boolean;
     public mc:any;
 
     constructor(index:number, size:number, parent:Cell)
@@ -188,8 +189,14 @@ class Round
 
     public board:Board;
 
-    public addStones:Array<Cell>;
-    public removeStones:Array<Cell>;
+    public addStones:Array<Cell>;           //hard add because in window
+    public addStonesNew:Array<Cell>;        //anim add when place new
+    public addStonesFadeIn:Array<Cell>;     //anim add when change to bigger
+    public removeStones:Array<Cell>;        //hard remove because in window
+    public removeStonesFadeOut:Array<Cell>; //anim remove because change to bigger
+    public winLine:Array<Cell>;
+    
+    public ingameStatus:IngameStatus;
 
     constructor(playerId1:string, playerId2:string, maxLevel:number, positionX:number, positionY:number)
     {
@@ -197,6 +204,13 @@ class Round
 
         this.maxLevel = maxLevel;
         
+        this.addStones = new Array();
+        this.addStonesNew = new Array();
+        this.addStonesFadeIn = new Array();
+        this.removeStones = new Array();
+        this.removeStonesFadeOut = new Array();
+        this.winLine = new Array();
+
         //players
         this.players = new Array();
         this.players.push(new Player(playerId1, Color.Red));
@@ -210,7 +224,9 @@ class Round
         this.board = new Board(maxLevel, new Point(positionX, positionY), new Rectangle(0, 0, c_rootWidth, c_rootHeight));
    
         //window in cell coordinates and position in top left corner
-        this.setWindow();        
+        this.setWindow();
+
+        this.ingameStatus = IngameStatus.WaitUser;
     }
 
     public nextPlayer()
@@ -222,14 +238,9 @@ class Round
     {
         var cellWindow = this.getCellWindow();
 
-        this.addStones = this.getVisibleStones(this.cell, cellWindow);
+        this.addStones = this.addStones.concat(this.getVisibleStones(this.cell, cellWindow));
 
         console.log("visible " + this.addStones.length + " cells: " + this.addStones.toString());
-
-        if(!this.addStones.length)
-        {
-            this.addStones = undefined;
-        }
     }
 
     public updateWindow()
@@ -238,17 +249,8 @@ class Round
 
         var result:Array<Array<Cell>> = this.getVisibleStonesIncrement(this.cell, cellWindow);
 
-        this.addStones = result[0];
-        this.removeStones = result[1];
-
-        if(!this.addStones.length)
-        {
-            this.addStones = undefined;
-        }
-        if(!this.removeStones.length)
-        {
-            this.removeStones = undefined;
-        }
+        this.addStones = this.addStones.concat(result[0]);
+        this.removeStones = this.removeStones.concat(result[1]);
 
         console.log("add " + result[0].length + " cells: " + result[0].toString());
         console.log("remove " + result[1].length + " cells: " + result[1].toString());
@@ -270,10 +272,10 @@ class Round
     {
         var invertScale = 1/this.board.getScale();
 
-        console.log("A " + this.board.window.width + "; " + this.board.position.x);
+        var boardCoord = this.board.getBoardCoord(0, 0);
 
-        var x = (-this.board.window.width/2) * invertScale / c_cellSize;
-        var y = (-this.board.window.height/2) * invertScale / c_cellSize;
+        var x = boardCoord.x / c_cellSize;
+        var y = boardCoord.y / c_cellSize;
         var width = this.board.window.width * invertScale / c_cellSize;
         var height = this.board.window.height * invertScale / c_cellSize;
 
@@ -294,12 +296,10 @@ class Round
                 if(cell.originalPos.x + cell.size < newWindow.x || cell.originalPos.y + cell.size < newWindow.y || 
                     cell.originalPos.x > newWindow.x + newWindow.width || cell.originalPos.y > newWindow.y + newWindow.height)
                 {
-                    cell.inWindow = false;
                     return [];
                 }
                 else    //is in
                 {
-                    cell.inWindow = true;
                     return [cell];
                 }
             }
@@ -331,9 +331,8 @@ class Round
                 if(cell.originalPos.x + cell.size < newWindow.x || cell.originalPos.y + cell.size < newWindow.y || 
                     cell.originalPos.x > newWindow.x + newWindow.width || cell.originalPos.y > newWindow.y + newWindow.height)
                 {
-                    if(cell.inWindow)
+                    if(cell.mc)
                     {
-                        cell.inWindow = false;
                         return [[],[cell]];
                     }
                     else
@@ -344,9 +343,8 @@ class Round
                 }
                 else    //is in
                 {
-                    if(!cell.inWindow)
+                    if(!cell.mc)
                     {
-                        cell.inWindow = true;
                         return [[cell],[]];
                     }
                     else
@@ -376,39 +374,85 @@ class Round
         return [[],[]];
     }
 
-    public addStone(x:number, y:number):Cell
+    private isStoneVisible(cell:Cell):boolean
+    {
+        var window = this.getCellWindow();
+
+        if(cell.originalPos.x + cell.size < window.x || cell.originalPos.y + cell.size < window.y || 
+            cell.originalPos.x > window.x + window.width || cell.originalPos.y > window.y + window.height)
+        {
+            return false;
+        }
+        else
+        {
+            return true;
+        }
+    }
+
+    public addStoneBoardCoord(x:number, y:number)   //coordinates in stage
+    {
+        var boardCoord = this.board.getBoardCoord(x, y);
+        this.addStone(boardCoord.x / c_cellSize, boardCoord.y / c_cellSize);
+    }
+
+    public addStone(x:number, y:number) //coordinates in cell
     {
         var size:number = Math.pow(2, this.players[this.currentPlayer].getLevel());
         var color = this.players[this.currentPlayer].color;
 
-        x = Math.round(x - (Math.abs(Math.round(x)) % size));
-        y = Math.round(y - (Math.abs(Math.round(y)) % size));
+        x = Math.floor(x - (Math.abs(Math.floor(x)) % size));
+        y = Math.floor(y - (Math.abs(Math.floor(y)) % size));
 
         var cellHalfSize = getSizeOfCell(this.maxLevel)/2;
         if(x < -cellHalfSize || y < -cellHalfSize || x >= cellHalfSize || y >= cellHalfSize)
         {
             console.log("error: You try to put new stone out of playing area: "+ x + "; "+ y);
-            return undefined;
         }
         
         var cell = this.cell.add(x, y, x + cellHalfSize, y + cellHalfSize, size, color);
     
         if(cell != undefined)
         {
+            //test visibility
+            if(this.isStoneVisible(cell))
+            {
+                this.addStonesNew.push(cell);
+                this.ingameStatus = IngameStatus.AddNew;
+            }
 
-            this.testWinRound(cell);
-            this.nextPlayer();
-            return cell;
+            //test win
+            var winLine = this.testWinRound(cell);
+
+            if(winLine)
+            {
+                this.winLine = winLine;
+                /*var str = "Player " + this.players[this.currentPlayer].id + " win: ";
+                winLine.forEach(element => {
+                    str += element.originalPos.toString();
+                });
+                console.log(str);
+
+                if(this.players[this.currentPlayer].getLevel() < this.maxLevel-1)
+                {
+                    this.upgradeLevel();
+                }
+                else
+                {
+                    console.log("Player " + this.players[this.currentPlayer].id + " win whole game!");
+                }*/
+            }
+            else
+            {
+                this.nextPlayer();
+            }
         }
         else
         {
             console.log("error: You try to put new stone into full cell: "+ x + "; " + y);
-
-            return undefined;
         }
     }
 
-    public testWinRound(cell:Cell):boolean
+    public testWinRound(cell:Cell):Array<Cell>
     {
         var horizontal:Array<Cell>;
         horizontal = this.getLine(cell, new Point(-1,0)).reverse().concat([cell]).concat(this.getLine(cell, new Point(1,0)));
@@ -441,25 +485,10 @@ class Round
 
         if(winLine)
         {
-            var str = "Player " + this.players[this.currentPlayer].id + " win: ";
-            winLine.forEach(element => {
-                str += element.originalPos.toString();
-            });
-            console.log(str);
-
-            if(this.players[this.currentPlayer].getLevel() < this.maxLevel-1)
-            {
-                this.upgradeLevel();
-            }
-            else
-            {
-                console.log("Player " + this.players[this.currentPlayer].id + " win whole game!");
-            }
-
-            return true;
+            return winLine;
         }
 
-        return false;
+        return undefined;
     }
 
     private getLine(cell:Cell, vec:Point):Array<Cell>
@@ -712,7 +741,7 @@ class Round
     }
 }
 
-class Board
+class Board //resoulution of Board in pixels
 {
     public isStable:boolean;
     public zoomLevel:number;
@@ -800,14 +829,22 @@ class Board
         return this.position;
     }
 
+    public getBoardCoord(x:number, y:number):Point  //from stage coord to board coord
+    {
+        var invertScale = 1/this.getScale();
+
+        var newX = (x - this.window.x - this.position.x) * invertScale;
+        var newY = (y - this.window.y - this.position.y) * invertScale;
+
+        return new Point(newX, newY);
+    }
+
     private checkBoundaries(position:Point):Point
     {
-        var sizeX = getSizeOfBoard(this.maxZoomLevel-1)*this.getScale();
+        var sizeX = getSizeOfBoard(this.maxZoomLevel-1)*this.getScale();    //in window space
         var sizeY = getSizeOfBoard(this.maxZoomLevel-1)*this.getScale();
 
         var newPosition:Point = new Point(position.x, position.y);
-
-        console.log(sizeX + "; " + this.window.toString() + "; " + position.x);
         
         //x
         if(sizeX < this.window.width)
@@ -839,9 +876,16 @@ class Board
 
         return newPosition;
     }
-
 }
 
-//resolution of Round in cells
-//resoulution of Board in pixels, 1 cell has constant size in px (32)
-//resolution of screen in pixels, between game and windo is zoom, zoom=1 mean game=window, minimal zoom = 1/maxLevel 
+//TODO
+//draw grid efectivly - dynamic add and remove
+//colorize selected cell in WaitUser
+//mouse drag and drop
+//animation states fadeIn, fadeOut
+//minigame chalenge
+//show message - x win round/game
+//touch events move and zoom
+
+//BUGS
+//not win in some direction
