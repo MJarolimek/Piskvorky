@@ -3,7 +3,7 @@
 var playerId1 = "A";
 var playerId2 = "B";
 
-var ROUND = require('./round');
+var ROUND = require('./main');
 
 //TEST ADD STONE ON INVALID POSITION
 /*
@@ -88,16 +88,17 @@ round.addStone(6,1);    //0
 
 round.setWindow(-2, -2, 4, 4);
 
-round.addStone(1,0);    //x
+round.addStone(5,-5);    //x
 round.addStone(6,2);    //0
-round.addStone(2,0);    //x
+round.addStone(4,-4);    //x
 round.addStone(6,3);    //0
-round.addStone(3,0);    //x
+round.addStone(3,-3);    //x
 round.addStone(6,4);    //0
-round.addStone(4,0);     //x
+round.addStone(2,-2);     //x
 round.addStone(6,6);    //0
-round.addStone(6,1);    //x
-round.addStone(-1,-1);   //o
-round.addStone(-3,0);    //x
+var cell = round.addStone(1,-1);    //x
+round.testWinRound(cell);
+//round.addStone(-1,-1);   //o
+//round.addStone(-3,0);    //x
 
-round.updateWindow(-3, -2, 4, 4);
+//round.updateWindow(-3, -2, 4, 4);

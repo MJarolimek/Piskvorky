@@ -281,7 +281,7 @@ class Round
 
         var cellWindow = new Rectangle(x, y, width, height)
 
-        console.log("getCellWindow " + cellWindow.toString());
+        //console.log("getCellWindow " + cellWindow.toString());
 
         return cellWindow;
     }
@@ -456,15 +456,15 @@ class Round
     {
         var horizontal:Array<Cell>;
         horizontal = this.getLine(cell, new Point(-1,0)).reverse().concat([cell]).concat(this.getLine(cell, new Point(1,0)));
-
+        console.log(horizontal.toString());
         var vertical:Array<Cell>;
         vertical = this.getLine(cell, new Point(0,-1)).reverse().concat([cell]).concat(this.getLine(cell, new Point(0,1)));
 
         var diagonal:Array<Cell>;
-        diagonal = this.getLine(cell, new Point(-1,-1)).reverse().concat([cell]).concat(this.getLine(cell, new Point(1,1)));
+        diagonal = this.getLine2(cell, new Point(-1,-1)).reverse().concat([cell]).concat(this.getLine2(cell, new Point(1,1)));
 
         var antidiagonal:Array<Cell>;
-        antidiagonal = this.getLine(cell, new Point(1,-1)).reverse().concat([cell]).concat(this.getLine(cell, new Point(-1,1)));
+        antidiagonal = this.getLine2(cell, new Point(1,-1)).reverse().concat([cell]).concat(this.getLine2(cell, new Point(-1,1)));
 
         if(horizontal.length >= 5)
         {
@@ -485,6 +485,11 @@ class Round
 
         if(winLine)
         {
+            var str = "Player " + this.players[this.currentPlayer].id + " win: ";
+            winLine.forEach(element => {
+                str += element.originalPos.toString();
+            });
+            console.log(str);
             return winLine;
         }
 
@@ -493,53 +498,9 @@ class Round
 
     private getLine(cell:Cell, vec:Point):Array<Cell>
     {
-        if(vec.x < 0 && vec.y < 0)
+        if(vec.x < 0)
         {
-            //get left up
-            var A = (Ver.Bottom | Hor.Right);
-            var B = -1;
-            var C = (Ver.Top | Hor.Left);
-            var D = (Ver.Bottom | Hor.Left);
-            var E = (Ver.Top | Hor.Right);
-
-            var dir = -3;
-        }
-        else if(vec.x > 0 && vec.y < 0)
-        {
-            //get right up
-            var A = (Ver.Bottom | Hor.Left);
-            var B = -1;
-            var C = (Ver.Top | Hor.Right);
-            var D = (Ver.Bottom | Hor.Right);
-            var E = (Ver.Top | Hor.Left);
-
-            var dir = -1;
-        }
-        else if(vec.x < 0 && vec.y > 0)
-        {
-            //get left down
-            var A = (Ver.Top | Hor.Right);
-            var B = -1;
-            var C = (Ver.Top | Hor.Left);
-            var D = (Ver.Bottom | Hor.Left);
-            var E = (Ver.Bottom | Hor.Right);
-            
-            var dir = 1;
-        }
-        else if(vec.x > 0 && vec.y > 0)
-        {
-            //get right down
-            var A = (Ver.Top | Hor.Left);
-            var B = -1;
-            var C = (Ver.Bottom | Hor.Left);
-            var D = (Ver.Bottom | Hor.Right);
-            var E = (Ver.Top | Hor.Right);
-
-            var dir = 3;
-        }
-        else if(vec.x < 0)
-        {
-            //get left
+            console.log("get left");
             var A = (Ver.Top | Hor.Right);
             var B = (Ver.Bottom | Hor.Right);
             var C = (Ver.Top | Hor.Left);
@@ -550,7 +511,7 @@ class Round
         }
         else if(vec.x > 0)
         {
-            //get right
+            console.log("get right");
             var A = (Ver.Top | Hor.Left);
             var B = (Ver.Bottom | Hor.Left);
             var C = (Ver.Top | Hor.Right);
@@ -561,7 +522,7 @@ class Round
         }
         else if(vec.y < 0)
         {
-            //get up
+            console.log("get up");
             var A = (Ver.Bottom | Hor.Left);
             var B = (Ver.Bottom | Hor.Right);
             var C = (Ver.Top | Hor.Left);
@@ -572,7 +533,7 @@ class Round
         }
         else if(vec.y > 0)
         {
-            //get down
+            console.log("get down");
             var A = (Ver.Top | Hor.Left);
             var B = (Ver.Top | Hor.Right);
             var C = (Ver.Bottom | Hor.Left);
@@ -604,15 +565,135 @@ class Round
             }
             else    //in different parent
             {
-                var counter = 0;
+                let path = [];
 
                 //go up in tree
                 while(cell.index == C || cell.index == D || cell.index == E)
                 {
+                   console.log("goUp "+ cell.index);
                    if(cell.parent.parent)
                    {
-                       counter++;
                        cell = cell.parent;
+                       path.push(cell.index);
+                   }
+                   else
+                   {
+                        return buffer;  //finish in root
+                   }
+                }
+                //go right from current cell
+                console.log("jump "+cell.index +"+"+dir);
+                cell = cell.parent.children[path.pop()+dir];
+
+                if(!cell || cell.getColor() != Color.Empty)
+                {
+                    return buffer;
+                }
+
+                //go down in tree
+                while(path.length > 0)
+                {
+                    console.log("goDown "+cell.index +"-"+dir);
+                    cell = cell.children[path.pop()-dir];
+                    if(!cell || cell.getColor() != Color.Empty)
+                    {
+                        return buffer;
+                    }
+                }
+                
+                //leaf
+                console.log("leaf " + index + "-" + dir);
+                cell = cell.children[index-dir];
+                if(cell && color == cell.getColor())
+                {
+                    buffer.push(cell);
+                }
+                else    //empty or different color
+                {
+                    return buffer;
+                }
+            }
+        }
+        return buffer;
+    }
+
+    private getLine2(cell:Cell, vec:Point):Array<Cell>
+    {
+        if(vec.x < 0 && vec.y < 0)
+        {
+            //get left up
+            var A = (Ver.Bottom | Hor.Right);
+            var B = (Ver.Top | Hor.Right);
+            var C = (Ver.Top | Hor.Left);
+            var D = (Ver.Bottom | Hor.Left);
+
+            var dir = -3;
+        }
+        else if(vec.x > 0 && vec.y < 0)
+        {
+            //get right up
+            var A = (Ver.Bottom | Hor.Left);
+            var B = (Ver.Top | Hor.Left);
+            var C = (Ver.Top | Hor.Right);
+            var D = (Ver.Bottom | Hor.Right);
+
+            var dir = -1;
+        }
+        else if(vec.x < 0 && vec.y > 0)
+        {
+            //get left down
+            var A = (Ver.Top | Hor.Right);
+            var B = (Ver.Top | Hor.Left);
+            var C = (Ver.Bottom | Hor.Left);
+            var D = (Ver.Bottom | Hor.Right);
+            
+            var dir = 1;
+        }
+        else if(vec.x > 0 && vec.y > 0)
+        {
+            //get right down
+            var A = (Ver.Top | Hor.Left);
+            var B = (Ver.Top | Hor.Right)
+            var C = (Ver.Bottom | Hor.Right);
+            var D = (Ver.Bottom | Hor.Left);
+
+            var dir = 3;
+        }
+
+        var color = cell.getColor();
+        var buffer = new Array();
+
+        for(var i=0; i < 4; i++)    //4 iteration
+        {
+            var index = cell.index;
+            
+            if(index == A) //in same parent
+            {
+                cell = cell.parent.children[index+dir];
+
+                if(cell && color == cell.getColor())    //same color
+                {
+                    buffer.push(cell);
+                }
+                else    //empty or different color
+                {
+                    return buffer;
+                }
+            }
+            else    //in different parent
+            {
+                let path = [];
+
+                //go up in tree
+                while(path.length == 0 
+                    || (path[path.length-1] != C && cell.index != C) 
+                    || (path[path.length-1] != B && cell.index != B)
+                    || (path[path.length-1] != D && cell.index != D))
+                {
+                   if(cell.parent.parent)
+                   {
+                       cell = cell.parent;
+                       path.push(cell.index);
                    }
                    else
                    {
@@ -621,7 +702,7 @@ class Round
                 }
 
                 //go right from current cell
-                cell = cell.parent.children[cell.index+dir];
+                cell = cell.parent.children[path.pop()+dir];
 
                 if(!cell || cell.getColor() != Color.Empty)
                 {
@@ -629,10 +710,9 @@ class Round
                 }
 
                 //go down in tree
-                while(counter > 1)
+                while(path.length > 0)
                 {
-                    counter--;
-                    cell = cell.children[index-dir];
+                    cell = cell.children[path.pop()-dir];
                     if(!cell || cell.getColor() != Color.Empty)
                     {
                         return buffer;
@@ -763,7 +843,7 @@ class Board //resoulution of Board in pixels
 
     public move(xDir:number, yDir:number)
     {
-        console.log("move("+xDir+", "+yDir+")");
+        //console.log("move("+xDir+", "+yDir+")");
 
         var position = new Point(this.position.x + xDir*c_cellSize*this.zoomLevel, this.position.y + yDir*c_cellSize*this.zoomLevel);
         position = this.checkBoundaries(position);
@@ -776,7 +856,7 @@ class Board //resoulution of Board in pixels
 
     public zoom(dir:number, originX:number, originY:number)
     {
-        console.log("zoom("+dir+")");
+        //console.log("zoom("+dir+")");
 
         var previousZoomLevel = this.zoomLevel;
         
@@ -879,13 +959,17 @@ class Board //resoulution of Board in pixels
 }
 
 //TODO
-//draw grid efectivly - dynamic add and remove
+//draw grid efectivly - dynamic add and remove, layers
 //colorize selected cell in WaitUser
 //mouse drag and drop
 //animation states fadeIn, fadeOut
 //minigame chalenge
 //show message - x win round/game
 //touch events move and zoom
+
+//text databaze
+//menu settings
+//skin
 
 //BUGS
 //not win in some direction
