@@ -684,11 +684,10 @@ class Round
             {
                 let path = [];
 
-                //go up in tree
-                while(path.length == 0 
-                    || (path[path.length-1] != C && cell.index != C) 
-                    || (path[path.length-1] != B && cell.index != B)
-                    || (path[path.length-1] != D && cell.index != D))
+                while(cell.index != A
+                    || (path.length == 0 
+                        && (path[path.length-1] != D && cell.index != B) 
+                        && (path[path.length-1] != B && cell.index != D)))
                 {
                    if(cell.parent.parent)
                    {
@@ -702,7 +701,16 @@ class Round
                 }
 
                 //go right from current cell
-                cell = cell.parent.children[path.pop()+dir];
+                var lastIndex = path.pop();
+                if(lastIndex == B || lastIndex == D || (lastIndex == A && path[path.length-1] == C))
+                {
+                    cell = cell.parent.children[C];
+                }
+                else if(lastIndex == A)
+                {
+                    cell = cell.parent.children[path[path.length-1]];
+
+                }
 
                 if(!cell || cell.getColor() != Color.Empty)
                 {
