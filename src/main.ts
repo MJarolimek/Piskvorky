@@ -456,15 +456,17 @@ class Round
     {
         var horizontal:Array<Cell>;
         horizontal = this.getLine(cell, new Point(-1,0)).reverse().concat([cell]).concat(this.getLine(cell, new Point(1,0)));
-        console.log(horizontal.toString());
+
         var vertical:Array<Cell>;
         vertical = this.getLine(cell, new Point(0,-1)).reverse().concat([cell]).concat(this.getLine(cell, new Point(0,1)));
 
-        var diagonal:Array<Cell>;
-        diagonal = this.getLine2(cell, new Point(-1,-1)).reverse().concat([cell]).concat(this.getLine2(cell, new Point(1,1)));
+        //var diagonal:Array<Cell>;
+        //diagonal = this.getLine2(cell, new Point(-1,-1)).reverse().concat([cell]).concat(this.getLine2(cell, new Point(1,1)));
 
         var antidiagonal:Array<Cell>;
         antidiagonal = this.getLine2(cell, new Point(1,-1)).reverse().concat([cell]).concat(this.getLine2(cell, new Point(-1,1)));
+
+        console.log("anti" + antidiagonal.toString());
 
         if(horizontal.length >= 5)
         {
@@ -474,10 +476,10 @@ class Round
         {
             var winLine = vertical;
         }
-        else if(diagonal.length >= 5)
+        /*else if(diagonal.length >= 5)
         {
             var winLine = diagonal;
-        }
+        }*/
         else if(antidiagonal.length >= 5)
         {
             var winLine = antidiagonal;
@@ -500,45 +502,41 @@ class Round
     {
         if(vec.x < 0)
         {
-            console.log("get left");
+            //console.log("get left");
             var A = (Ver.Top | Hor.Right);
             var B = (Ver.Bottom | Hor.Right);
             var C = (Ver.Top | Hor.Left);
             var D = (Ver.Bottom | Hor.Left);
-            var E = -1;
 
             var dir = -1;
         }
         else if(vec.x > 0)
         {
-            console.log("get right");
+            //console.log("get right");
             var A = (Ver.Top | Hor.Left);
             var B = (Ver.Bottom | Hor.Left);
             var C = (Ver.Top | Hor.Right);
             var D = (Ver.Bottom | Hor.Right);
-            var E = -1;
 
             var dir = 1;
         }
         else if(vec.y < 0)
         {
-            console.log("get up");
+            //console.log("get up");
             var A = (Ver.Bottom | Hor.Left);
             var B = (Ver.Bottom | Hor.Right);
             var C = (Ver.Top | Hor.Left);
             var D = (Ver.Top | Hor.Right);
-            var E = -1;
             
             var dir = -2;
         }
         else if(vec.y > 0)
         {
-            console.log("get down");
+            //console.log("get down");
             var A = (Ver.Top | Hor.Left);
             var B = (Ver.Top | Hor.Right);
             var C = (Ver.Bottom | Hor.Left);
             var D = (Ver.Bottom | Hor.Right);
-            var E = -1;
 
             var dir = 2;
         }
@@ -568,9 +566,9 @@ class Round
                 let path = [];
 
                 //go up in tree
-                while(cell.index == C || cell.index == D || cell.index == E)
+                while(cell.index == C || cell.index == D)
                 {
-                   console.log("goUp "+ cell.index);
+                   //console.log("goUp "+ cell.index);
                    if(cell.parent.parent)
                    {
                        cell = cell.parent;
@@ -582,7 +580,7 @@ class Round
                    }
                 }
                 //go right from current cell
-                console.log("jump "+cell.index +"+"+dir);
+                //console.log("jump "+cell.index +"+"+dir);
                 cell = cell.parent.children[path.pop()+dir];
 
                 if(!cell || cell.getColor() != Color.Empty)
@@ -593,7 +591,7 @@ class Round
                 //go down in tree
                 while(path.length > 0)
                 {
-                    console.log("goDown "+cell.index +"-"+dir);
+                    //console.log("goDown "+cell.index +"-"+dir);
                     cell = cell.children[path.pop()-dir];
                     if(!cell || cell.getColor() != Color.Empty)
                     {
@@ -602,7 +600,7 @@ class Round
                 }
                 
                 //leaf
-                console.log("leaf " + index + "-" + dir);
+                //console.log("leaf " + index + "-" + dir);
                 cell = cell.children[index-dir];
                 if(cell && color == cell.getColor())
                 {
@@ -627,27 +625,27 @@ class Round
             var C = (Ver.Top | Hor.Left);
             var D = (Ver.Bottom | Hor.Left);
 
-            var dir = -3;
+            var dir = [-3];
         }
         else if(vec.x > 0 && vec.y < 0)
         {
-            //get right up
+            console.log("get right up");
             var A = (Ver.Bottom | Hor.Left);
             var B = (Ver.Top | Hor.Left);
             var C = (Ver.Top | Hor.Right);
             var D = (Ver.Bottom | Hor.Right);
 
-            var dir = -1;
+            var dir = [3,1,-1,-3];
         }
         else if(vec.x < 0 && vec.y > 0)
         {
-            //get left down
-            var A = (Ver.Top | Hor.Right);
-            var B = (Ver.Top | Hor.Left);
-            var C = (Ver.Bottom | Hor.Left);
-            var D = (Ver.Bottom | Hor.Right);
+            console.log("get left down");
+            var A = (Ver.Top | Hor.Right);//1
+            var B = (Ver.Bottom | Hor.Right);//3
+            var C = (Ver.Bottom | Hor.Left);//2
+            var D = (Ver.Top | Hor.Left);//0
             
-            var dir = 1;
+            var dir = [3,1,-1,-3];
         }
         else if(vec.x > 0 && vec.y > 0)
         {
@@ -657,11 +655,13 @@ class Round
             var C = (Ver.Bottom | Hor.Right);
             var D = (Ver.Bottom | Hor.Left);
 
-            var dir = 3;
+            var dir = [3];
         }
 
         var color = cell.getColor();
         var buffer = new Array();
+
+        console.log("start");
 
         for(var i=0; i < 4; i++)    //4 iteration
         {
@@ -669,7 +669,7 @@ class Round
             
             if(index == A) //in same parent
             {
-                cell = cell.parent.children[index+dir];
+                cell = cell.parent.children[index+dir[A]];
 
                 if(cell && color == cell.getColor())    //same color
                 {
@@ -684,29 +684,32 @@ class Round
             {
                 let path = [];
 
-                while(cell.index != A
-                    || (path.length == 0 
-                        && (path[path.length-1] != D && cell.index != B) 
-                        && (path[path.length-1] != B && cell.index != D)))
+
+                while(cell.index != A 
+                    && (path.length == 0 
+                            || ((path[path.length-1] != D || cell.index != B) 
+                                && (path[path.length-1] != B || cell.index != D))))
                 {
+                    console.log(cell.index + "; "+ A + "; "+ path[path.length-1]);
                    if(cell.parent.parent)
                    {
-                       cell = cell.parent;
-                       path.push(cell.index);
+                        path.push(cell.index);
+                        cell = cell.parent;
                    }
                    else
                    {
+                       console.log("finish in root");
                         return buffer;  //finish in root
                    }
                 }
+                console.log(cell.index + " path" + path.toString());
 
                 //go right from current cell
-                var lastIndex = path.pop();
-                if(lastIndex == B || lastIndex == D || (lastIndex == A && path[path.length-1] == C))
+                if(cell.index == B || cell.index == D || (cell.index == A && path[path.length-1] == C))
                 {
                     cell = cell.parent.children[C];
                 }
-                else if(lastIndex == A)
+                else if(cell.index == A)
                 {
                     cell = cell.parent.children[path[path.length-1]];
 
@@ -718,9 +721,14 @@ class Round
                 }
 
                 //go down in tree
-                while(path.length > 0)
+                while(path.length > 1)
                 {
-                    cell = cell.children[path.pop()-dir];
+                    let pathIndex = path.pop();
+                    let pathIndexChild = path[path.length-1];
+
+                    cell = cell.children[pathIndex+dir[pathIndex]];
+                    
+                    
                     if(!cell || cell.getColor() != Color.Empty)
                     {
                         return buffer;
@@ -728,7 +736,7 @@ class Round
                 }
                 
                 //leaf
-                cell = cell.children[index-dir];
+                cell = cell.children[index+dir[index]];
                 if(cell && color == cell.getColor())
                 {
                     buffer.push(cell);
